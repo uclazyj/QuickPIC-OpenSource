@@ -514,8 +514,9 @@
       subroutine copyto(this,that,lpos,sdim,ddim)
       
          implicit none
-         
+         ! I think the following intent should be 'in'
          class(field2d), intent(inout) :: this
+         ! I think the following intent should be 'inout' (Fei agreed with this)
          class(field3d), intent(in) :: that
          integer, intent(in) :: lpos
          integer, intent(in), dimension(:) :: sdim, ddim

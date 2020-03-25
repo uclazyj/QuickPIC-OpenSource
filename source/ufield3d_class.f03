@@ -403,6 +403,9 @@
          integer, dimension(:), intent(in):: sdim, ddim
 ! local data         
          character(len=18), save :: sname = 'copyin:'
+         ! First element is 1,2 or 3, corresponds to x,y,z component
+         ! Second element is x position
+         ! Third element is y position
          real, dimension(:,:,:), pointer :: rf2d
          integer :: i,j,k,rank,nd1,nd2
 

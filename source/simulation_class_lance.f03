@@ -2,7 +2,7 @@
 ! update: 01/09/2018
 
       module simulation_class
-
+      
       use parallel_class
       use parallel_pipe_class
       use perrors_class
@@ -19,7 +19,7 @@
       use mpi
 
       implicit none
-
+      
       private
 
       public :: simulation
@@ -41,31 +41,17 @@
          class(spect3d), pointer :: sp3 => null()
          class(spect2d), pointer :: sp2 => null()
          type(field2d), allocatable :: qb, qe, psit, psi, div_vpot, reg
-         type(field2d), allocatable :: fxy, bxyz, cu, dcu, amu, epw, epwb
-         !qb: rho_b
-         !qe: rho - J_z
-         !psit: d_psi / dt = E_z
-         !div_vpot: div * current
-         !reg: (Not used)
-         !fxy: transverse gradient of psi
-         !later on it stores the electric (after the iteration)
-         !bxyz : 3D Magnetic field
-         !cu: current Density. Initialized in k space
-         !dcu: dp / dxi acceleration Density
-         !amu: momentum Density: dyatic: tensor
-         
-         !epwb: (Ex,Ey) = (By,-Bx)  (field produced by the beam)
-         !epw: (By,-Bx)  (field produced by the plasma) Initialized in k space
+         type(field2d), allocatable :: fxy, bxyz, cu, dcu, amu, epw, epwb,vpot         
          type(field3d), allocatable :: bexyz, bbxyz
-         type(field3d), allocatable :: psi3d,cu3d
+         type(field3d), allocatable :: psi3d,cu3d,vpot3d
 
          contains
-
+         
          generic :: new => init_sim_fields
          generic :: del => end_sim_fields
 
          procedure, private :: init_sim_fields, end_sim_fields
-
+         
       end type sim_fields
 !
       type sim_beams
@@ -78,16 +64,16 @@
          class(spect2d), pointer :: sp2 => null()
          type(beam3d), dimension(:), allocatable :: beam
          type(fdist3d_wrap), dimension(:), allocatable :: pf
-
+         
          contains
-
+         
          generic :: new => init_sim_beams
          generic :: del => end_sim_beams
 
          procedure, private :: init_sim_beams, end_sim_beams
 
       end type sim_beams
-!
+!      
       type sim_species
 
          private
@@ -100,14 +86,14 @@
          type(species2d), dimension(:), allocatable :: spe
 
          contains
-
+         
          generic :: new => init_sim_species
          generic :: del => end_sim_species
 
          procedure, private :: init_sim_species, end_sim_species
 
       end type sim_species
-!
+!      
       type sim_diag
 
          private
@@ -122,7 +108,7 @@
          integer :: df
 
       end type sim_diag
-!
+!      
       type simulation
 
          private
@@ -133,7 +119,7 @@
          class(perrors),pointer :: err => null()
          class(spect3d), pointer :: sp3 => null()
          class(spect2d), pointer :: sp2 => null()
-
+         
          type(sim_fields) :: fields
          type(sim_beams) :: beams
          type(sim_species) :: species
@@ -146,7 +132,7 @@
          real :: dex, dxi, dex2, dt
 
          contains
-
+         
          generic :: new => init_simulation
          generic :: del => end_simulation
          generic :: go => go_simulation
@@ -159,20 +145,20 @@
 !
       character(len=20), save :: class = 'simulation: '
       character(len=128), save :: erstr
-
+            
       contains
 !
       subroutine init_simulation(this)
 
          implicit none
-
+         
          class(simulation), intent(inout) :: this
 ! local data
          character(len=18), save :: sname = 'init_simulation:'
          real :: min, max, n0, dx, dy, dz, dt
          integer :: indx, indy, indz
          logical :: read_rst
-
+         
          allocate(this%in)
          call this%in%new()
          this%err => this%in%err
@@ -196,7 +182,7 @@
          call this%in%get('simulation.box.z(1)',min)
          call this%in%get('simulation.box.z(2)',max)
          dz=(max-min)/real(2**indz)
-
+         
          this%dex = dx
          this%dxi = dz
          this%dex2 = dx * dx
@@ -221,7 +207,7 @@
          call this%beams%new(this%in,this%fields)
          call this%species%new(this%in,this%fields,(this%start3d-1)*dt)
 
-         call this%init_diag()
+         call this%init_diag()                 
 
          allocate(this%tag_spe(this%nspecies),this%tag_beam(this%nbeams))
          allocate(this%id_spe(this%nspecies),this%id_beam(this%nbeams))
@@ -230,13 +216,13 @@
          allocate(this%id(9+size(this%diag)))
          this%id(:) = MPI_REQUEST_NULL
          this%id_spe(:) = MPI_REQUEST_NULL
-         this%id_beam(:) = MPI_REQUEST_NULL
-         this%id_bq(:,:) = MPI_REQUEST_NULL
+         this%id_beam(:) = MPI_REQUEST_NULL                 
+         this%id_bq(:,:) = MPI_REQUEST_NULL                 
 
          call this%err%werrfl2(class//sname//' ended')
 
       end subroutine init_simulation
-!
+!         
       subroutine end_simulation(this)
 
          implicit none
@@ -245,9 +231,9 @@
 ! local data
          character(len=18), save :: sname = 'end_simulation:'
          integer :: ierr
-
+         
          call this%err%werrfl2(class//sname//' started')
-
+         
 !         call this%fields%del()
 !         call this%beams%del()
 !         call this%species%del()
@@ -267,7 +253,7 @@
          character(len=18), save :: sname = 'init_sim_fields:'
          character(len=18), save :: class = 'sim_fields:'
          character(len=20) :: s1, s2, s3
-         character(len=:), allocatable :: ff
+         character(len=:), allocatable :: ff   
          integer :: i,n,ndump,j,k,l,m
 
          this%err => input%err
@@ -285,7 +271,7 @@
 
          call this%bexyz%new(this%p,this%err,this%sp3,dim=3)
          call this%bbxyz%new(this%p,this%err,this%sp3,dim=3)
-
+         
          call this%qb%new(this%p,this%err,this%sp2,dim=1,fftflag=.true.,gcells=1)
          call this%qe%new(this%p,this%err,this%sp2,dim=1,fftflag=.true.)
          call this%psit%new(this%p,this%err,this%sp2,dim=1,fftflag=.true.)
@@ -301,7 +287,7 @@
          call this%bxyz%new(this%p,this%err,this%sp2,dim=3,fftflag=.true.)
 
          call input%get('simulation.nspecies',n)
-
+         
          loop1: do i = 1, n
             write (s1, '(I4.4)') i
             call input%info('species('//trim(s1)//').diag',n_children=m)
@@ -326,7 +312,7 @@
          end do loop1
 
          call input%info('field.diag',n_children=n)
-
+         
          loop2: do i = 1, n
             write (s1,'(I4.4)') i
             call input%get('field.diag('//trim(s1)//').ndump',ndump)
@@ -344,7 +330,25 @@
                end do
             end if
          end do loop2
-
+         
+         loop3: do i = 1, n
+            write (s1,'(I4.4)') i
+            call input%get('field.diag('//trim(s1)//').ndump',ndump)
+            if (ndump > 0) then
+               call input%info('field.diag('//trim(s1)//').name',n_children=m)
+               do j = 1, m
+                  write (s2,'(I4.4)') j
+                  if(allocated(ff)) deallocate(ff)
+                  call input%get('field.diag('//trim(s1)//').name('//trim(s2)//')',ff)
+                  if (ff == 'vpotx' .or. ff == 'vpoty' .or. ff == 'vpotz' ) then
+                     allocate(this%vpot,this%vpot3d)
+                     call this%vpot%new(this%p,this%err,this%sp2,dim=3,fftflag=.true.)
+                     call this%vpot3d%new(this%p,this%err,this%sp3,dim=3)
+                     exit loop3
+                  end if
+               end do
+            end if
+         end do loop3
 
          call this%err%werrfl2(class//sname//' ended')
 
@@ -359,7 +363,7 @@
          character(len=18), save :: sname = 'end_sim_fields:'
          character(len=18), save :: class = 'sim_fields:'
          integer :: i, n
-
+         
          call this%err%werrfl2(class//sname//' started')
 
          call this%bexyz%del()
@@ -410,13 +414,13 @@
          this%p => input%pp
          this%sp3 => input%sp
          this%sp2 => input%sp
-
+         
          call this%err%werrfl2(class//sname//' started')
 
-         call input%get('simulation.nbeams',n)
+         call input%get('simulation.nbeams',n)         
 
          allocate(this%beam(n),this%pf(n))
-
+         
          do i = 1, n
             arg(:,:) = 0.0
             write (sn,'(I3.3)') i
@@ -438,7 +442,9 @@
             case (100)
                allocate(fdist3d_100::this%pf(i)%p)
                call this%pf(i)%p%new(input,i)
-! Add new distributions right above this line
+            case (10)
+               allocate(fdist3d_010::this%pf(i)%p)
+               call this%pf(i)%p%new(input,i)
             case default
                write (erstr,*) 'Invalid beam profile number:', npf
                call this%err%equit(class//sname//erstr)
@@ -447,9 +453,9 @@
             call input%get(trim(s1)//'.q',qm)
             call input%get(trim(s1)//'.m',qbm)
             qbm = qm/qbm
-
+               
             call input%get('simulation.dt',dt)
-
+            
             call this%beam(i)%new(this%p,this%err,this%sp3,this%pf(i)%p,qbm=qbm,&
             &dt=dt,ci=1.0,xdim=7)
 
@@ -481,7 +487,7 @@
          character(len=18), save :: sname = 'end_sim_beams:'
          character(len=18), save :: class = 'sim_beams:'
          integer :: i, n
-
+         
          call this%err%werrfl2(class//sname//' started')
 
          n = size(this%beam)
@@ -517,7 +523,7 @@
          this%p => input%pp
          this%sp3 => input%sp
          this%sp2 => input%sp
-
+         
          call this%err%werrfl2(class//sname//' started')
 
          call input%get('simulation.n0',n0)
@@ -531,7 +537,7 @@
          call input%get('simulation.nspecies',n)
 
          allocate(this%spe(n),this%pf(n))
-
+         
          do i = 1, n
 
             write (sn,'(I3.3)') i
@@ -575,7 +581,7 @@
          character(len=18), save :: sname = 'end_sim_species:'
          character(len=18), save :: class = 'sim_species:'
          integer :: i, n
-
+         
          call this%err%werrfl2(class//sname//' started')
 
          n = size(this%spe)
@@ -600,25 +606,19 @@
 
          call this%err%werrfl2(class//sname//' started')
 
-         ! dump initialization data
-         if (this%start3d == 1) then
-            this%tstep = 0
-            call this%diag_simulation()
-         endif
-
          do i = this%start3d, this%nstep3d
 
             this%tstep = i
-            write (erstr,*) '3D step:', i
+            write (erstr,*) '3D step:', i        
             call this%err%werrfl0(erstr)
-
+            
             do m = 1, this%nbeams
                this%tag_bq(m,1) = ntag()
                this%tag_bq(m,2) = ntag()
                call this%beams%beam(m)%qdp(this%id_bq(m,1),this%id_bq(m,2),&
                &this%id_bq(m,3),this%tag_bq(m,1),this%tag_bq(m,2))
             end do
-
+   
             do l =  1, this%nspecies
                this%tag_spe(l) = ntag()
                call this%species%spe(l)%precv(this%tag_spe(l))
@@ -633,17 +633,11 @@
             call this%fields%psit%precv(this%tag(6))
             this%tag(7) = ntag()
             call this%fields%bxyz%precv(this%tag(7))
-
-            ! Copy the 2d field (fxy should be transverse fields now) stored in fxy to the first 2 dimensions of the 
-            ! 3d field stored in bexyz, at longitudinal position: \xi = 1
-            call this%fields%fxy%cb(this%fields%bexyz,1,(/1,2/),(/1,2/))
-            ! Copy psit (shoule be Ez) to the third dimension of the
-            ! 3d field stored in bexyz, at longitudinal position: \xi = 1
+   
+            call this%fields%fxy%cb(this%fields%bexyz,1,(/1,2/),(/1,2/))         
             call this%fields%psit%cb(this%fields%bexyz,1,(/1/),(/3/))
-
-            ! Copy the 2d magnetic field to 3d magnetic field
             call this%fields%bxyz%cb(this%fields%bbxyz,1,(/1,2,3/),(/1,2,3/))
-
+   
             do j = 1, this%nstep2d
                write (erstr,*) '2D step:', j
                call this%err%werrfl0(erstr)
@@ -652,161 +646,114 @@
                      call MPI_WAIT(this%id_bq(m,2),istat,ierr)
                   end do
                endif
-               ! Initialize qb to be 0
                call this%fields%qb%as(0.0)
                do m = 1, this%nbeams
-                  ! Get the 2d beam charge from the 3d beam charge (add the charge from all the beams)
                   call this%beams%beam(m)%qdp(this%fields%qb,j+1)
-                  ! qdp: charge deposit
                end do
-               ! Use qb%rs to calculate qe%ks (FFT)
                call this%fields%qb%fftrk(1)
-               ! Use qb%ks as the source to solve for the electric field produced by the beam (Ex,Ey) or (By,-Bx): epwb%ks
-               ! qb is n * n matrix, epwb is n * n * 2 matrix. The 2 layers store Ex (By) and Ey (-Bx) respectively
+               !calculate transverse beam fields, epwb->(Ex,Ey)=(By,-Bx)
                call this%fields%qb%elf(this%fields%epwb)
-               !elf: electric field
-               ! Initialize qe to be 0
                call this%fields%qe%as(0.0)
                do l = 1, this%nspecies
-                  ! Get the 2d plasma charge from the 3d plasma charge (add the charge from all the species)
-                  call this%species%spe(l)%qdp(this%fields%qe)
+                  call this%species%spe(l)%qdp(this%fields%qe)                     
                end do
-               ! Use qe%rs to calculate qe%ks (FFT)
                call this%fields%qe%fftrk(1)
-               ! Use qe%ks as the source to solve possion equation,
-               ! and store the solution in psi%ks
+               !poisson solve for psi
                call this%fields%qe%pot(this%fields%psi)
-               ! Use psi%ks to calculate fxy%ks
+               !get force on particle fxy
                call this%fields%psi%grad(this%fields%fxy)
-               ! Use fxy%ks to calculate fxy%rs
                call this%fields%fxy%fftkr(1)
-               ! Use psi%ks to calculate psi%rs
                call this%fields%psi%fftkr(1)
-               do l = 1, this%nspecies
-                  ! Get psi on each particle
+               !get psi on each particle (and therefore pz)
+               do l = 1, this%nspecies            
                   call this%species%spe(l)%extpsi(this%fields%psi,this%dex)
                end do
-               ! psi%rs%rf(i,j,k) *= dex^2
                call this%fields%psi%mult(this%fields%psi,this%dex*this%dex)
-               ! Copy the 2d field psi%rs%rf to 3d field psi3d%rs%rf, at the longitudinal position j+1
-               ! psi3d%rs%rf(1,j',k,j+1) = psi%rs%rf(1,j',k)
                if (allocated(this%fields%psi3d)) call this%fields%psi%cb(this%fields%psi3d,j+1,(/1/),(/1/))
-               ! Calculate the divergence of the current Density
-               ! cu%ks -> div_vpot%ks
+               !take divergence of current and store in div_vpot (name?)
                call this%fields%cu%div(this%fields%div_vpot)
-               ! Solve possion's equation, from div_vpot%ks to get psit%ks (equation (19))
+               !solve for dpsi/dxi=Ez (Eq. 19)
                call this%fields%div_vpot%pot(this%fields%psit)
-               ! psit%ks%rf(i,j,k) *= (-dex)
+               !correct for minus in poisson solve and norm.
                call this%fields%psit%mult(this%fields%psit,-this%dex)
-               ! Use psit%ks to calculate psit%rs (iFFT)
                call this%fields%psit%fftkr(1)
-               ! Solve poisson's equation for magnetic field,
-               ! from cu%ks to bxyz%ks (Eq. 17)
+               !Solve for Bz (curl of current calculated in library) (Eq. 17)
                call this%fields%cu%bf(this%fields%bxyz)
                do l = 1, this%iter
-                  ! predictor correctors
-
-                  ! bxyz%ks%rf(1,j,k) = epw%ks%rf(2,j,k) * (- dex)  
-                  ! bxyz%ks%rf(2,j,k) = epw%ks%rf(1,j,k) * dex
+                  !epw stores (By,-Bx) due to the plasma (similar to beam but =/= (Ex,Ey))
+                  !uses multiply2 to store epw(1,*,*) into bxyz(2,*,*), etc.
                   call this%fields%bxyz%mult(this%fields%epw,(/1,2/),(/2,1/),(/-this%dex,this%dex/))
-                  ! bxyz%ks%rf(3,j,k) *= dex
                   call this%fields%bxyz%mult(this%fields%bxyz,(/3/),(/3/),(/this%dex/))
-                  ! bxyz%ks%rf(1,j,k) -= epwb%ks%rf(2,j,k)
+                  !add in beam contribution, again need to flip
                   call this%fields%bxyz%sub(this%fields%bxyz,this%fields%epwb,(/1/),(/1/),(/2/))
-                  ! bxyz%ks%rf(2,j,k) += epwb%ks%rf(1,j,k)
                   call this%fields%bxyz%add(this%fields%bxyz,this%fields%epwb,(/2/),(/2/),(/1/))
                   call this%fields%bxyz%fftkr(2)
-                  ! cu%rs%rf(i,j,k) = 0.0
-                  ! The cu, dcu and amu are initialized to be 0 in real space
-                  ! Their state = 0
                   call this%fields%cu%as(0.0)
                   call this%fields%dcu%as(0.0)
                   call this%fields%amu%as(0.0)
+                  !deposit current,accel,momentum
                   do m = 1, this%nspecies
-                     ! deposit the current, acceleration and momentum flux
                      call this%species%spe(m)%amjdp(this%fields%fxy,this%fields%bxyz,this%fields%psit,&
                      &this%fields%cu,this%fields%amu,this%fields%dcu,this%dex)
                   end do
                   call this%fields%cu%mult(this%fields%cu,this%dex)
                   call this%fields%amu%mult(this%fields%amu,this%dex)
                   call this%fields%dcu%mult(this%fields%dcu,this%dex)
-
                   if (l == this%iter) then
-                     do m = 1, this%nspecies
-                        ! q%rs%rf(1,j,k) += cu%rs%rf(3,j,k)
-                        ! then spe(m)%q3%rs%rf(1,j',k,j+1) = spe(m)%q%rs%rf(1,j',k) (copy 2d field to 3d field at the local longitudinal position)
+                    !add Jz back to particles to get true charge and copy for dumping (if last iteration)
+                     do m = 1, this%nspecies              
                         call this%species%spe(m)%cbq(j+1)
                      end do
+                     !if requested copy out current for dumping
                      if (allocated(this%fields%cu3d)) then
-                        ! cu3d%rs%rf(1~3,j',k,j+1) = cu%rs%rf(1~3,j',k)
                         call this%fields%cu%cb(this%fields%cu3d,j+1,(/1,2,3/),(/1,2,3/))
-                     end if
+                     end if               
                   endif
                   call this%fields%cu%fftrk(1)
                   call this%fields%dcu%fftrk(1)
                   call this%fields%amu%fftrk(3)
-                  ! Use cu%ks to calculate epw%ks (Eq. 16)
+                  !vector potential solve for b field
                   call this%fields%cu%bfqp(this%fields%dcu,this%fields%amu,this%fields%epw,this%dex2,&
                   &this%dex)
-                  ! The following 5 lines of code appeared before
-                  ! Calculate the divergence of the current Density
-                  ! cu%ks -> div_vpot%ks
+                  !recalculate fields (see above)
                   call this%fields%cu%div(this%fields%div_vpot)
-                  ! Solve possion's equation, from div_vpot%ks to get psit%ks (equation (19))
                   call this%fields%div_vpot%pot(this%fields%psit)
-                  ! psit%ks%rf(i,j,k) *= (-dex)
                   call this%fields%psit%mult(this%fields%psit,-this%dex)
-                  ! Use psit%ks to calculate psit%rs (iFFT)
                   call this%fields%psit%fftkr(1)
-                  ! Solve poisson's equation for magnetic field,
-                  ! from cu%ks to bxyz%ks (Eq. 17?)
                   call this%fields%cu%bf(this%fields%bxyz)
-               enddo
-               ! The following 5 lines of code appeared before
-               ! bxyz%ks%rf(1,j,k) = epw%ks%rf(2,j,k) * (- dex)  
-               ! bxyz%ks%rf(2,j,k) = epw%ks%rf(1,j,k) * dex
+               enddo !exit iteration loop
+               !Solve for the vector potential 
+               if (allocated(this%fields%vpot)) then
+                  call this%fields%cu%vpot(this%fields%vpot)
+                  call this%fields%vpot%fftkr(1)
+                  call this%fields%vpot%mult(this%fields%vpot,this%dex2)
+                  call this%fields%vpot%cb(this%fields%vpot3d,j+1,(/1,2,3/),(/1,2,3/))
+               end if               
                call this%fields%bxyz%mult(this%fields%epw,(/1,2/),(/2,1/),(/-this%dex,this%dex/))
-               ! bxyz%ks%rf(3,j,k) *= dex
                call this%fields%bxyz%mult(this%fields%bxyz,(/3/),(/3/),(/this%dex/))
-               ! bxyz%ks%rf(1,j,k) -= epwb%ks%rf(2,j,k)
                call this%fields%bxyz%sub(this%fields%bxyz,this%fields%epwb,(/1/),(/1/),(/2/))
-               ! bxyz%ks%rf(2,j,k) += epwb%ks%rf(1,j,k)
                call this%fields%bxyz%add(this%fields%bxyz,this%fields%epwb,(/2/),(/2/),(/1/))
                call this%fields%bxyz%fftkr(2)
-
-               ! Now bxyz = is the total magnetic field (both plasma and beam)
-               ! At this point, fxy = (-(Ex-By),-(Ey+Bx)) (total)
-
-
-               ! fxy%rs%rf(i,j,k) *= -1
+               !change fxy so it now store e field (before grad psi)
                call this%fields%fxy%mult(this%fields%fxy,-1.0)
-               ! fxy%rs%rf(1,j,k) += bxyz%rs%rf(2,j,k)
                call this%fields%fxy%add(this%fields%fxy,this%fields%bxyz,(/1/),(/1/),(/2/))
-               ! fxy%rs%rf(2,j,k) -= bxyz%rs%rf(1,j,k)
                call this%fields%fxy%sub(this%fields%fxy,this%fields%bxyz,(/2/),(/2/),(/1/))
-               ! Now fxy = (Ex, Ey) (total)
-
-               ! dcu%ks%rf(i,j,k) *= dxi
+               !reverse finite different to calculate current at this xi
                call this%fields%dcu%mult(this%fields%dcu,this%dxi)
-               ! cu%ks%rf(1~2,j,k) -= dcu%ks%rf(1~2,j,k)
                call this%fields%cu%sub(this%fields%cu,this%fields%dcu,(/1,2/),(/1,2/),(/1,2/))
-               do m = 1, this%nspecies
+               do m = 1, this%nspecies              
                   call this%species%spe(m)%push(this%fields%fxy,this%fields%bxyz,this%fields%psit,&
                   &this%dex)
                end do
-               ! fxy%rs%rf(i,j,k) *= dex
+               !store fields for beam push
                call this%fields%fxy%mult(this%fields%fxy,this%dex)
-               ! bexyz%rs%rf(1~2,j',k,j+1) = fxy%rs%rf(1~2,j',k)
                call this%fields%fxy%cb(this%fields%bexyz,j+1,(/1,2/),(/1,2/))
-               ! bexyz%rs%rf(3,j',k,j+1) = psit%rs%rf(1,j',k)
                call this%fields%psit%cb(this%fields%bexyz,j+1,(/1/),(/3/))
-               ! bxyz%rs%rf(1~2,j,k) *= dex
                call this%fields%bxyz%mult(this%fields%bxyz,(/1,2/),(/1,2/),(/this%dex,this%dex/))
-               ! bbxyz%rs%rf(1~3,j',k,j+1) = bxyz%rs%rf(1~3,j',k)
                call this%fields%bxyz%cb(this%fields%bbxyz,j+1,(/1,2,3/),(/1,2,3/))
             enddo
-
-            do m = 1, this%nspecies
+            
+            do m = 1, this%nspecies                       
                call this%species%spe(m)%psend(this%tag_spe(m),this%id_spe(m))
             end do
             call MPI_WAIT(this%id(5),istat,ierr)
@@ -819,21 +766,20 @@
             call this%fields%psit%psend(this%tag(6),this%id(8))
             call MPI_WAIT(this%id(9),istat,ierr)
             call this%fields%bxyz%psend(this%tag(7),this%id(9))
-
+      
             do m = 1, this%nbeams
                this%tag_beam(m) = ntag()
                call MPI_WAIT(this%id_beam(m),istat,ierr)
-               ! Use the 3d E&M fields (bexyz%rs, bbxyz%rs) to push the 3d beam particles
                call this%beams%beam(m)%push(this%fields%bexyz,this%fields%bbxyz,this%dex,this%dxi,&
                &this%tag_beam(m),this%tag_beam(m),this%id_beam(m))
             end do
-
+            
             call this%diag_simulation()
 
-            do m = 1, this%nspecies
+            do m = 1, this%nspecies                       
                call MPI_WAIT(this%id_spe(m),istat,ierr)
                call this%species%spe(m)%renew(i*this%dt)
-            end do
+            end do                             
          end do
 
          call this%err%werrfl2(class//sname//' ended')
@@ -871,12 +817,12 @@
          alx2 = max
          call this%in%get('simulation.box.y(1)',min)
          call this%in%get('simulation.box.y(2)',max)
-         aly1 = min
-         aly2 = max
+         aly1 = min 
+         aly2 = max 
          call this%in%get('simulation.box.z(1)',min)
          call this%in%get('simulation.box.z(2)',max)
-         alz1 = min
-         alz2 = max
+         alz1 = min 
+         alz2 = max 
          call this%in%get('simulation.dt',dt)
 
          do i = 1, this%nbeams
@@ -953,7 +899,7 @@
                         if (this%in%found('beam('//trim(s1)//').diag'//'('//trim(s2)//').slice')) then
                            call this%in%info('beam('//trim(s1)//').diag'//'('//trim(s2)//').slice',n_children=n)
                            do ii = 1, n
-                              n_diag = n_diag + 1
+                              n_diag = n_diag + 1 
                               this%diag(n_diag)%df = ndump
                               this%diag(n_diag)%obj => this%beams%beam(i)
                               allocate(this%diag(n_diag)%slice,this%diag(n_diag)%slice_pos)
@@ -1002,7 +948,7 @@
                               &label = 'Charge Density')
                            end do
                         else
-                           n_diag = n_diag + 1
+                           n_diag = n_diag + 1 
                            this%diag(n_diag)%df = ndump
                            this%diag(n_diag)%obj => this%beams%beam(i)
                            allocate(this%diag(n_diag)%dim)
@@ -1025,7 +971,7 @@
                            &label = 'Charge Density')
                         end if
                      case ('raw')
-                        n_diag = n_diag + 1
+                        n_diag = n_diag + 1 
                         this%diag(n_diag)%df = ndump
                         this%diag(n_diag)%obj => this%beams%beam(i)
                         allocate(this%diag(n_diag)%psample)
@@ -1094,7 +1040,7 @@
                      if (this%in%found('species('//trim(s1)//').diag'//'('//trim(s2)//').slice')) then
                         call this%in%info('species('//trim(s1)//').diag'//'('//trim(s2)//').slice',n_children=n)
                         do ii = 1, n
-                           n_diag = n_diag + 1
+                           n_diag = n_diag + 1 
                            this%diag(n_diag)%df = ndump
                            this%diag(n_diag)%obj => obj
                            allocate(this%diag(n_diag)%slice,this%diag(n_diag)%slice_pos)
@@ -1143,7 +1089,7 @@
                            &label = trim(sn4))
                         end do
                      else
-                        n_diag = n_diag + 1
+                        n_diag = n_diag + 1 
                         this%diag(n_diag)%df = ndump
                         this%diag(n_diag)%obj => obj
                         allocate(this%diag(n_diag)%dim)
@@ -1230,11 +1176,32 @@
                      sn4 = '\Psi'
                      dim = 1
                      obj => this%fields%psi3d
+                  case ('vpotx')
+                     sn1 = 'Ax'
+                     sn2 = 'ax'
+                     sn3 = 'mc^2/e'
+                     sn4 = 'Vector Potential'
+                     dim = 1
+                     obj => this%fields%vpot3d
+                  case ('vpoty')
+                     sn1 = 'Ay'
+                     sn2 = 'ay'
+                     sn3 = 'mc^2/e'
+                     sn4 = 'Vector Potential'
+                     dim = 2
+                     obj => this%fields%vpot3d
+                  case ('vpotz')
+                     sn1 = 'Az'
+                     sn2 = 'az'
+                     sn3 = 'mc^2/e'
+                     sn4 = 'Vector Potential'
+                     dim = 3
+                     obj => this%fields%vpot3d
                   end select
                   if (this%in%found('field.diag('//trim(s1)//').slice')) then
                      call this%in%info('field.diag('//trim(s1)//').slice',n_children=l)
                      do k = 1, l
-                        n_diag = n_diag + 1
+                        n_diag = n_diag + 1 
                         this%diag(n_diag)%df = ndump
                         this%diag(n_diag)%obj => obj
                         allocate(this%diag(n_diag)%slice,this%diag(n_diag)%slice_pos)
@@ -1283,7 +1250,7 @@
                         &label = trim(sn4))
                      end do
                   else
-                     n_diag = n_diag + 1
+                     n_diag = n_diag + 1 
                      this%diag(n_diag)%df = ndump
                      this%diag(n_diag)%obj => obj
                      allocate(this%diag(n_diag)%dim)
@@ -1310,7 +1277,7 @@
          end do
 
          if (rst) then
-            call this%in%get('simulation.ndump_restart',ndump)
+            call this%in%get('simulation.ndump_restart',ndump) 
             do i = 1, this%nbeams
                write (s1,'(I4.4)') i
                write (s2,'(I10.10)') this%p%getidproc()
@@ -1351,7 +1318,7 @@
          n = size(this%diag)
 
          do i = 1, n
-            if (mod(this%tstep,this%diag(i)%df) == 0) then
+            if (mod(this%tstep-1,this%diag(i)%df) == 0) then
                call this%diag(i)%file%new(n = this%tstep, t = this%tstep*dt)
                select type (obj => this%diag(i)%obj)
                type is (field3d)
@@ -1393,7 +1360,7 @@
                      this%tag(1) = ntag()
                      call MPI_WAIT(this%id(idn+i),istat,ierr)
                      call obj%wrq(this%diag(i)%file,this%tag(1),this%tag(1),this%id(idn+i))
-                  end if
+                  end if                  
                end select
             end if
          end do
@@ -1403,14 +1370,14 @@
       end subroutine diag_simulation
 !
       function ntag()
-
+      
          implicit none
          integer, save :: tag = 0
          integer :: ntag
-
+                 
          ntag = tag
          tag = tag + 1
-
+      
       end function ntag
-!
+!                  
       end module simulation_class
